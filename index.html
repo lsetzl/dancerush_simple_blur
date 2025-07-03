@@ -334,6 +334,7 @@
         <div class="info-box">
             <strong>💡 使い方：</strong>上下の境界線と左右のぼかし範囲を調整して、プレイヤーとパネル以外をぼかします。
             赤いガイドラインで範囲を確認しながら調整できます。
+            <br><span style="color: #e74c3c;">※ 音声は含まれません。編集アプリで後から追加してください。</span>
         </div>
         
         <div class="upload-area" id="uploadArea">
@@ -596,9 +597,41 @@
                 outputCanvas.height = originalVideo.videoHeight;
                 const outputCtx = outputCanvas.getContext('2d');
                 
+                // ビデオとオーディオのストリームを結合
+                const videoStream = outputCanvas.captureStream(fps);
+                let audioStream;
+                let combinedStream;
+                
+                try {
+                    // 元動画から音声ストリームを取得
+                    const audioElement = document.createElement('audio');
+                    audioElement.src = originalVideo.src;
+                    audioElement.muted = false;
+                    audioElement.play();
+                    
+                    const audioContext = new AudioContext();
+                    const source = audioContext.createMediaElementSource(audioElement);
+                    const destination = audioContext.createMediaStreamDestination();
+                    source.connect(destination);
+                    source.connect(audioContext.destination);
+                    
+                    audioStream = destination.stream;
+                    
+                    // ビデオとオーディオを結合
+                    const videoTracks = videoStream.getVideoTracks();
+                    const audioTracks = audioStream.getAudioTracks();
+                    combinedStream = new MediaStream([...videoTracks, ...audioTracks]);
+                    
+                    // 再生を同期
+                    audioElement.currentTime = originalVideo.currentTime;
+                    audioElement.playbackRate = originalVideo.playbackRate;
+                } catch (e) {
+                    console.warn('音声の取得に失敗しました:', e);
+                    combinedStream = videoStream;
+                }
+                
                 // MediaRecorderをセットアップ
-                const stream = outputCanvas.captureStream(fps);
-                const mediaRecorder = new MediaRecorder(stream, {
+                const mediaRecorder = new MediaRecorder(combinedStream, {
                     mimeType: 'video/webm;codecs=vp9',
                     videoBitsPerSecond: 4000000 // 高品質
                 });
