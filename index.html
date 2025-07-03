@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ダンスラ動画背景ぼかし</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #1a1a1a;
+            color: #fff;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+        }
+        
+        .container {
+            width: 100%;
+            max-width: 900px;
+            background: #2a2a2a;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        }
+        
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 24px;
+            background: linear-gradient(45deg, #3498db, #9b59b6);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        .upload-area {
+            border: 2px dashed #3498db;
+            border-radius: 8px;
+            padding: 40px;
+            text-align: center;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            margin-bottom: 20px;
+        }
+        
+        .upload-area:hover {
+            border-color: #9b59b6;
+            background: rgba(52, 152, 219, 0.1);
+        }
+        
+        .upload-area.dragging {
+            border-color: #e74c3c;
+            background: rgba(231, 76, 60, 0.1);
+        }
+        
+        input[type="file"] {
+            display: none;
+        }
+        
+        .video-section {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .video-wrapper {
+            background: #000;
+            border-radius: 8px;
+            overflow: hidden;
+            position: relative;
+        }
+        
+        .video-wrapper h3 {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 14px;
+            z-index: 10;
+        }
+        
+        video, canvas {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+        
+        .preview-canvas {
+            position: relative;
+        }
+        
+        .overlay-guides {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+        
+        .guide-line {
+            position: absolute;
+            background: rgba(255, 0, 0, 0.5);
+            z-index: 5;
+        }
+        
+        .guide-line.horizontal {
+            width: 100%;
+            height: 2px;
+        }
+        
+        .guide-line.vertical {
+            width: 2px;
+            height: 100%;
+        }
+        
+        .controls {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        label {
+            flex: 0 0 160px;
+            font-size: 14px;
+        }
+        
+        input[type="range"] {
+            flex: 1;
+            height: 6px;
+            background: #3a3a3a;
+            border-radius: 3px;
+            outline: none;
+            -webkit-appearance: none;
+        }
+        
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 18px;
+            height: 18px;
+            background: #3498db;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+        
+        .value-display {
+            flex: 0 0 50px;
+            text-align: right;
+            font-size: 14px;
+            color: #3498db;
+        }
+        
+        .button-group {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+        
+        button {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .primary-btn {
+            background: linear-gradient(45deg, #3498db, #9b59b6);
+            color: white;
+        }
+        
+        .primary-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(52, 152, 219, 0.4);
+        }
+        
+        .primary-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .secondary-btn {
+            background: #3a3a3a;
+            color: white;
+        }
+        
+        .secondary-btn:hover {
+            background: #4a4a4a;
+        }
+        
+        .processing {
+            text-align: center;
+            padding: 20px;
+            color: #3498db;
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background: #3a3a3a;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(45deg, #3498db, #9b59b6);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+        
+        .hidden {
+            display: none;
+        }
+        
+        .info-box {
+            background: rgba(52, 152, 219, 0.1);
+            border: 1px solid #3498db;
+            border-radius: 6px;
+            padding: 15px;
+            margin-bottom: 20px;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+        
+        /* レスポンシブデザイン */
+        @media (max-width: 768px) {
+            body {
+                padding: 10px;
+            }
+            
+            .container {
+                padding: 20px;
+                border-radius: 8px;
+            }
+            
+            h1 {
+                font-size: 20px;
+                margin-bottom: 20px;
+            }
+            
+            .upload-area {
+                padding: 30px 20px;
+            }
+            
+            /* スマホでは動画を縦に配置 */
+            .video-section {
+                grid-template-columns: 1fr;
+                gap: 15px;
+            }
+            
+            .control-group {
+                flex-direction: column;
+                align-items: stretch;
+                gap: 10px;
+            }
+            
+            label {
+                flex: none;
+                text-align: left;
+            }
+            
+            .value-display {
+                position: absolute;
+                right: 20px;
+                top: 0;
+            }
+            
+            .control-group {
+                position: relative;
+            }
+            
+            input[type="range"] {
+                width: 100%;
+            }
+            
+            .info-box {
+                font-size: 13px;
+                padding: 12px;
+            }
+            
+            button {
+                padding: 14px 20px;
+                font-size: 15px;
+                width: 100%;
+            }
+            
+            .button-group {
+                flex-direction: column;
+            }
+        }
+        
+        /* さらに小さい画面用 */
+        @media (max-width: 480px) {
+            h1 {
+                font-size: 18px;
+            }
+            
+            .upload-area p {
+                font-size: 14px;
+            }
+            
+            .upload-area p:last-child {
+                font-size: 11px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>ダンスラ動画背景ぼかし</h1>
+        
+        <div class="info-box">
+            <strong>💡 使い方：</strong>上下の境界線と左右のぼかし範囲を調整して、プレイヤーとパネル以外をぼかします。
+            赤いガイドラインで範囲を確認しながら調整できます。
+        </div>
+        
+        <div class="upload-area" id="uploadArea">
+            <p>動画をドラッグ&ドロップ または クリックして選択</p>
+            <p style="font-size: 12px; margin-top: 10px; opacity: 0.7;">対応形式: MP4, WebM, MOV</p>
+        </div>
+        <input type="file" id="fileInput" accept="video/*">
+        
+        <div class="video-section hidden" id="videoSection">
+            <div class="video-wrapper">
+                <h3>オリジナル</h3>
+                <video id="originalVideo" controls></video>
+            </div>
+            <div class="video-wrapper">
+                <h3>プレビュー</h3>
+                <div class="preview-canvas">
+                    <canvas id="previewCanvas"></canvas>
+                    <div class="overlay-guides" id="overlayGuides"></div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="controls hidden" id="controls">
+            <div class="control-group">
+                <label>上下の境界位置</label>
+                <input type="range" id="splitPosition" min="40" max="80" value="65" step="1">
+                <span class="value-display" id="splitValue">65%</span>
+            </div>
+            
+            <div class="control-group">
+                <label>左右のぼかし範囲</label>
+                <input type="range" id="sideBlur" min="5" max="30" value="15" step="1">
+                <span class="value-display" id="sideValue">15%</span>
+            </div>
+        </div>
+        
+        <div class="processing hidden" id="processing">
+            <p>処理中... <span id="progressText">0%</span></p>
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressBar"></div>
+            </div>
+            <p style="font-size: 12px; opacity: 0.7; margin-top: 10px;">
+                残り時間: 約<span id="remainingTime">計算中...</span>秒
+            </p>
+        </div>
+        
+        <div class="button-group hidden" id="actionButtons">
+            <button class="primary-btn" id="processBtn">処理開始（WebM出力）</button>
+        </div>
+        
+        <div class="info-box hidden" id="mp4Info" style="margin-top: 20px;">
+            <strong>⚠️ 重要：</strong>WebM形式はSNSでサポートされていません。
+            MP4に変換が必要です → <a href="https://cloudconvert.com/webm-to-mp4" target="_blank" style="color: #3498db;">CloudConvert</a>
+        </div>
+    </div>
+    
+    <script>
+        // 要素の取得
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+        const videoSection = document.getElementById('videoSection');
+        const originalVideo = document.getElementById('originalVideo');
+        const previewCanvas = document.getElementById('previewCanvas');
+        const overlayGuides = document.getElementById('overlayGuides');
+        const controls = document.getElementById('controls');
+        const actionButtons = document.getElementById('actionButtons');
+        const processing = document.getElementById('processing');
+        const progressBar = document.getElementById('progressBar');
+        const progressText = document.getElementById('progressText');
+        const remainingTime = document.getElementById('remainingTime');
+        const mp4Info = document.getElementById('mp4Info');
+        
+        // コントロール
+        const splitPosition = document.getElementById('splitPosition');
+        const sideBlur = document.getElementById('sideBlur');
+        const splitValue = document.getElementById('splitValue');
+        const sideValue = document.getElementById('sideValue');
+        const processBtn = document.getElementById('processBtn');
+        
+        // 変数
+        let videoFile;
+        let ctx;
+        let animationId;
+        
+        // 定数
+        const BLUR_STRENGTH = 5; // 固定ぼかし強度
+        
+        // イベントリスナー
+        uploadArea.addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', handleFileSelect);
+        
+        // ドラッグ&ドロップ
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragging');
+        });
+        
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragging');
+        });
+        
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragging');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFile(files[0]);
+            }
+        });
+        
+        // スライダー更新
+        splitPosition.addEventListener('input', (e) => {
+            splitValue.textContent = e.target.value + '%';
+            updateGuides();
+            updatePreview();
+        });
+        
+        sideBlur.addEventListener('input', (e) => {
+            sideValue.textContent = e.target.value + '%';
+            updateGuides();
+            updatePreview();
+        });
+        
+        // ボタン
+        processBtn.addEventListener('click', startProcessing);
+        
+        // 動画再生時の更新
+        originalVideo.addEventListener('play', () => {
+            updatePreview();
+        });
+        
+        originalVideo.addEventListener('seeked', () => {
+            updatePreview();
+        });
+        
+        // ファイル処理
+        function handleFileSelect(e) {
+            const file = e.target.files[0];
+            if (file) handleFile(file);
+        }
+        
+        function handleFile(file) {
+            if (!file.type.startsWith('video/')) {
+                alert('動画ファイルを選択してください');
+                return;
+            }
+            
+            videoFile = file;
+            const url = URL.createObjectURL(file);
+            originalVideo.src = url;
+            
+            originalVideo.onloadedmetadata = () => {
+                previewCanvas.width = originalVideo.videoWidth;
+                previewCanvas.height = originalVideo.videoHeight;
+                ctx = previewCanvas.getContext('2d');
+                
+                showInterface();
+                updateGuides();
+                
+                // 最初のフレームを表示するために少し待つ
+                originalVideo.currentTime = 0.1;
+                setTimeout(() => {
+                    updatePreview();
+                }, 100);
+            };
+        }
+        
+        function showInterface() {
+            videoSection.classList.remove('hidden');
+            controls.classList.remove('hidden');
+            actionButtons.classList.remove('hidden');
+            mp4Info.classList.remove('hidden');
+        }
+        
+        function updateGuides() {
+            if (!previewCanvas.width) return;
+            
+            const split = parseInt(splitPosition.value) / 100;
+            const side = parseInt(sideBlur.value) / 100;
+            
+            overlayGuides.innerHTML = `
+                <!-- 上下境界線 -->
+                <div class="guide-line horizontal" style="top: ${split * 100}%;"></div>
+                <!-- 左側境界線 -->
+                <div class="guide-line vertical" style="left: ${side * 100}%;"></div>
+                <!-- 右側境界線 -->
+                <div class="guide-line vertical" style="right: ${side * 100}%;"></div>
+                <!-- ぼかしエリア表示 -->
+                <div class="blur-preview" style="top: 0; left: 0; right: 0; height: ${split * 100}%;"></div>
+                <div class="blur-preview" style="top: 0; left: 0; width: ${side * 100}%; height: ${split * 100}%;"></div>
+                <div class="blur-preview" style="top: 0; right: 0; width: ${side * 100}%; height: ${split * 100}%;"></div>
+            `;
+        }
+        
+        function updatePreview() {
+            if (!ctx || !originalVideo.videoWidth) return;
+            
+            if (animationId) {
+                cancelAnimationFrame(animationId);
+            }
+            
+            function render() {
+                drawFrame(ctx, previewCanvas.width, previewCanvas.height);
+                
+                if (!originalVideo.paused && !originalVideo.ended) {
+                    animationId = requestAnimationFrame(render);
+                }
+            }
+            
+            // 静止画の場合も必ず1回は描画
+            render();
+        }
+        
+        function drawFrame(context, width, height) {
+            const split = parseInt(splitPosition.value) / 100;
+            const side = parseInt(sideBlur.value) / 100;
+            const splitY = height * split;
+            const sideWidth = width * side;
+            
+            // まず全体を描画
+            context.drawImage(originalVideo, 0, 0, width, height);
+            
+            // 上部全体にぼかしを適用
+            context.save();
+            context.filter = `blur(${BLUR_STRENGTH}px)`;
+            
+            // 上部全体
+            context.drawImage(
+                originalVideo,
+                0, 0, width, splitY,
+                0, 0, width, splitY
+            );
+            
+            context.restore();
+            
+            // 中央部分をクリアに再描画（ぼかしを上書き）
+            context.save();
+            context.drawImage(
+                originalVideo,
+                sideWidth, 0, width - sideWidth * 2, splitY,
+                sideWidth, 0, width - sideWidth * 2, splitY
+            );
+            context.restore();
+        }
+        
+        async function startProcessing() {
+            processing.classList.remove('hidden');
+            processBtn.disabled = true;
+            
+            const startTime = Date.now();
+            
+            try {
+                const fps = 30;
+                const duration = originalVideo.duration;
+                const totalFrames = Math.floor(duration * fps);
+                
+                // 出力用キャンバス
+                const outputCanvas = document.createElement('canvas');
+                outputCanvas.width = originalVideo.videoWidth;
+                outputCanvas.height = originalVideo.videoHeight;
+                const outputCtx = outputCanvas.getContext('2d');
+                
+                // MediaRecorderをセットアップ
+                const stream = outputCanvas.captureStream(fps);
+                const mediaRecorder = new MediaRecorder(stream, {
+                    mimeType: 'video/webm;codecs=vp9',
+                    videoBitsPerSecond: 4000000 // 高品質
+                });
+                
+                const chunks = [];
+                mediaRecorder.ondataavailable = (e) => {
+                    if (e.data.size > 0) chunks.push(e.data);
+                };
+                
+                mediaRecorder.onstop = () => {
+                    const blob = new Blob(chunks, { type: 'video/webm' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `blurred_${videoFile.name.replace(/\.[^/.]+$/, '')}.webm`;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                    
+                    processing.classList.add('hidden');
+                    processBtn.disabled = false;
+                };
+                
+                // 録画開始
+                mediaRecorder.start();
+                
+                // リアルタイムで処理
+                originalVideo.currentTime = 0;
+                await originalVideo.play();
+                
+                function processRealtime() {
+                    drawFrame(outputCtx, outputCanvas.width, outputCanvas.height);
+                    
+                    // 進捗更新
+                    const progress = (originalVideo.currentTime / duration) * 100;
+                    progressBar.style.width = progress + '%';
+                    progressText.textContent = Math.floor(progress) + '%';
+                    
+                    const elapsed = (Date.now() - startTime) / 1000;
+                    const remaining = duration - originalVideo.currentTime;
+                    remainingTime.textContent = Math.floor(remaining);
+                    
+                    if (!originalVideo.ended) {
+                        requestAnimationFrame(processRealtime);
+                    } else {
+                        mediaRecorder.stop();
+                    }
+                }
+                
+                processRealtime();
+                
+            } catch (error) {
+                console.error('処理エラー:', error);
+                alert('動画の処理中にエラーが発生しました');
+                processing.classList.add('hidden');
+                processBtn.disabled = false;
+            }
+        }
+    </script>
+</body>
+</html>
