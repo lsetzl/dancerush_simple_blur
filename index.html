@@ -650,6 +650,8 @@
                     a.click();
                     URL.revokeObjectURL(url);
                     
+                    // 処理完了後の後処理
+                    originalVideo.muted = false; // ミュート解除
                     processing.classList.add('hidden');
                     processBtn.disabled = false;
                 };
@@ -685,6 +687,7 @@
             } catch (error) {
                 console.error('処理エラー:', error);
                 alert('動画の処理中にエラーが発生しました');
+                originalVideo.muted = false; // エラー時もミュート解除
                 processing.classList.add('hidden');
                 processBtn.disabled = false;
             }
